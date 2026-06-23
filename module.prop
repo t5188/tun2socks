@@ -1,7 +1,7 @@
 id=Atun2socks
 name=tun2socks
-version=v1.02
-versionCode=20260607
+version=v1.00
+versionCode=20260623
 author=Jerry
-description=Transparent Proxy Service
+description=tun2socks
 updateJson=https://github.com/t5188/tun2socks/raw/main/update.json

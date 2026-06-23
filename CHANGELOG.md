@@ -1,3 +1,3 @@
 # Release Notes
-## v1.02
-_Release Date: 2026-6-7_
+## v1.00
+_Release Date: 2026-6-23_
