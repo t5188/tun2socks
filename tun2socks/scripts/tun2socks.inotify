@@ -1,6 +1,5 @@
 #!/system/bin/sh
 scripts_dir="$(cd "$(dirname "$0")" && pwd)"
-. "${scripts_dir}/tun2socks.ini"
 events=$1
 monitor_file=$3
 

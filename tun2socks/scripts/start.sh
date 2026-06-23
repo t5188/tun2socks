@@ -1,5 +1,7 @@
 #!/system/bin/sh
 scripts_dir="$(cd "$(dirname "$0")" && pwd)"
+module_dir="/data/adb/modules/Atun2socks"
+export PATH="/data/adb/ap/bin:/data/adb/ksu/bin:/data/adb/magisk:$PATH"
 . "${scripts_dir}/tun2socks.ini"
 
 start_proxy() {
