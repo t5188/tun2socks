@@ -175,7 +175,7 @@ hev_pid=$!
 forward -I
 exec_dns_tun
 uid_rules add
-nohup busybox setuidgid $uid:$gid "${parent_dir}"/bin/xray run -c "${parent_dir}"/conf/client.json >/dev/null 2>&1 &
+nohup busybox setuidgid $uid:$gid "${parent_dir}"/bin/xray run -confdir "${parent_dir}"/conf/ >/dev/null 2>&1 &
 xray_pid=$!
 echo "hev:${hev_pid}" > "${scripts_dir}"/pid.txt
 echo "xray:${xray_pid}" >> "${scripts_dir}"/pid.txt
