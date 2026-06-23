@@ -1,0 +1,16 @@
+#!/system/bin/sh
+scripts_dir="$(cd "$(dirname "$0")" && pwd)"
+. "${scripts_dir}/settings.ini"
+events=$1
+monitor_file=$3
+
+if [ "${monitor_file}" == "disable" ]; then
+  case "${events}" in
+  "d")
+    ${scripts_dir}/tun2socks.service enable >/dev/null 2>&1
+    ;;
+  "n")
+    ${scripts_dir}/tun2socks.service disable >/dev/null 2>&1
+    ;;
+  esac
+fi

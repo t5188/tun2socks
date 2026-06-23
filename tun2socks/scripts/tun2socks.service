@@ -1,0 +1,192 @@
+#!/system/bin/sh
+scripts_dir="$(cd "$(dirname "$0")" && pwd)"
+export PATH="/data/adb/ap/bin:/data/adb/ksu/bin:/data/adb/magisk:$PATH"
+. "${scripts_dir}"/tun2socks.ini
+
+permission() {
+  chown -R 0:3005 "${scripts_dir}"
+  chmod -R 755 "${scripts_dir}"
+}
+
+ipv6_enable() {
+  sysctl -w \
+  net.ipv4.ip_forward=1 \
+  net.ipv6.conf.all.forwarding=1 \
+  net.ipv6.conf.all.accept_ra=2 \
+  net.ipv6.conf.wlan0.accept_ra=2 \
+  net.ipv6.conf.all.disable_ipv6=0 \
+  net.ipv6.conf.default.disable_ipv6=0 \
+  net.ipv6.conf.wlan0.disable_ipv6=0
+}
+
+fw_clean() {
+  local ipt_cmd="${1}"
+  ${ipt_cmd} -S 2>/dev/null |
+    awk '$1=="-N" { print $2 }' |
+    sort -u |
+    while read -r chain; do
+      ${ipt_cmd} -L "${chain}" -n >/dev/null 2>&1 || continue
+      ${ipt_cmd} -L "${chain}" -n --line-numbers 2>/dev/null |
+        awk '$2=="REJECT" || $2=="DROP" { print $1 }' |
+        sort -rn |
+        while read -r num; do
+          ${ipt_cmd} -w -D "${chain}" "${num}"
+        done
+    done
+}
+
+find_packages_uid() {
+  uids=()
+  local out_file="${scripts_dir}"/uids.list
+  local tmp_file=$(mktemp)
+
+  eval "$( {
+    [ ${#package_list[@]} -gt 0 ] && printf "TARGET MAIN %s\n" "${package_list[@]}"
+    [ ${#appclones[@]} -gt 0 ] && printf "TARGET CLONE %s\n" "${appclones[@]}"
+    sed 's/^/FILE /' /data/system/packages.list 2>/dev/null
+  } | awk -v tmp="$tmp_file" '
+  $1 == "TARGET" {
+    if ($2 == "MAIN") main_pkgs[$3] = 1
+    if ($2 == "CLONE") clone_pkgs[$3] = 1
+    next
+  }
+  $1 == "FILE" {
+    pkg = $2
+    uid = $3
+    if (pkg in main_pkgs) {
+      printf "uids+=(\"%s\");\n", uid
+      print pkg, uid >> tmp
+    }
+    if (pkg in clone_pkgs) {
+      clone_uid = 999 * 100000 + uid
+      printf "uids+=(\"%s\");\n", clone_uid
+      print pkg, clone_uid >> tmp
+    }
+  }
+  ' )"
+
+  uids=($(printf "%s\n" "${uids[@]}" | sort -n | uniq))
+  sort -k2 -n -u "$tmp_file" > "$out_file"
+  rm -f "$tmp_file"
+}
+
+uid_rules() {
+  find_packages_uid
+  local action=${1}
+  if [[ ${#package_list[@]} -gt 0 ]]; then
+    for whiteapp in "${uids[@]}"; do
+      ip -4 rule ${action} uidrange ${whiteapp}-${whiteapp} table ${index} priority 1050
+      ip -6 rule ${action} uidrange ${whiteapp}-${whiteapp} table ${index} priority 1050
+    done
+  fi
+}
+
+ip_rules() {
+  local action=$1
+  ipv4_rules=()
+  for cidr in "${local_cidr[@]}"; do
+    ipv4_rules+=("priority 3000 to ${cidr} lookup main")
+  done
+  ipv4_rules+=(
+    "iif lo goto 6000 priority 5000"
+    "iif ${device} lookup main suppress_prefixlength 0 priority 5010"
+    "iif ${device} goto 6000 priority 5020"
+    "nop priority 6000"
+    "lookup main priority 7000"
+  )
+  for rule in "${ipv4_rules[@]}"; do
+    ip -4 rule "${action}" ${rule}
+  done
+
+  ipv6_rules=()
+  for cidr in "${local_cidr6[@]}"; do
+    ipv6_rules+=("priority 3000 to ${cidr} lookup main")
+  done
+  ipv6_rules+=(
+    "iif lo goto 6000 priority 5000"
+    "iif ${device} lookup main suppress_prefixlength 0 priority 5010"
+    "iif ${device} goto 6000 priority 5020"
+    "nop priority 6000"
+    "lookup main priority 7000"
+  )
+  for rule in "${ipv6_rules[@]}"; do
+    ip -6 rule "${action}" ${rule}
+  done
+}
+
+forward() {
+  local action=$1
+  if [[ "${action}" == "-D" ]]; then
+    ip_rules "del"
+    return 1
+  fi
+    sysctl -w \
+    net.ipv4.ip_forward=1 \
+    net.ipv4.conf.default.rp_filter=2 \
+    net.ipv4.conf.all.rp_filter=2
+    ipv6_enable
+    ip_rules "add"
+}
+
+dns_tun() {
+  local name="DNS2TUN"
+  local ip=${1}
+  local ipt_cmd=${2}
+  local action=${3}
+# action may equal A, or it may equal I.
+    if [[ "${action}" == "-A" ]] || [[ "${action}" == "-I" ]]; then
+      local action1="add"
+    elif [[ "${action}" == "-D" ]]; then
+      local action1="del"
+    fi
+    ${ip} rule ${action1} fwmark ${fwmark} table ${index} priority 1000
+    ${ip} route ${action1} default dev ${device} table ${index}
+    if [[ "${action}" == "-D" ]]; then
+      ${ipt_cmd} -t mangle -D OUTPUT -j ${name}_OUTPUT
+      ${ipt_cmd} -t mangle -F ${name}_OUTPUT
+      ${ipt_cmd} -t mangle -X ${name}_OUTPUT
+      return 1
+    fi
+      ${ipt_cmd} -t mangle -N ${name}_OUTPUT
+      ${ipt_cmd} -t mangle -F ${name}_OUTPUT
+      ${ipt_cmd} -t mangle -A ${name}_OUTPUT -m owner --uid-owner $uid --gid-owner $gid -j RETURN
+      ${ipt_cmd} -t mangle -A ${name}_OUTPUT -p udp --dport 53 -j MARK --set-mark ${fwmark}
+      ${ipt_cmd} -t mangle -A ${name}_OUTPUT -p tcp --dport 53 -j MARK --set-mark ${fwmark}
+      ${ipt_cmd} -t mangle ${action} OUTPUT -j ${name}_OUTPUT
+}
+
+exec_dns_tun() {
+  dns_tun "ip -4" "iptables" "-I"
+  dns_tun "ip -6" "ip6tables" "-I"
+}
+
+rm_dns_tun() {
+  dns_tun "ip -4" "iptables" "-D"
+  dns_tun "ip -6" "ip6tables" "-D"
+}
+
+start_tun() {
+permission
+fw_clean iptables
+fw_clean ip6tables
+nohup busybox setuidgid $uid:$gid "${scripts_dir}"/hev "${scripts_dir}"/hev.yml >/dev/null 2>&1 &
+hev_pid=$!
+forward -I
+exec_dns_tun
+uid_rules add
+nohup busybox setuidgid $uid:$gid "${scripts_dir}"/xray run -c "${scripts_dir}"/client.json >/dev/null 2>&1 &
+xray_pid=$!
+echo "hev:${hev_pid}" > "${scripts_dir}"/pid.txt
+echo "xray:${xray_pid}" >> "${scripts_dir}"/pid.txt
+}
+
+stop_tun() {
+uid_rules del
+forward -D
+rm_dns_tun
+while IFS=: read name pid; do
+  kill -9 "$pid" 2>/dev/null
+done < "${scripts_dir}"/pid.txt
+}
+
+case "$1" in enable) start_tun ;; disable) stop_tun ;; esac

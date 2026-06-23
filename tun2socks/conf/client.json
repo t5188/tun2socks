@@ -1,0 +1,262 @@
+{
+  "log": {
+    "access": "/data/adb/tun2socks/log/access.log",
+    "error": "/data/adb/tun2socks/log/error.log",
+    "loglevel": "none",
+    "dnsLog": true
+  },
+  "inbounds": [
+    {
+      "listen": "::",
+      "port": 1536,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "network": "tcp,udp",
+        "followRedirect": true
+      },
+      "streamSettings": {
+        "sockopt": {
+          "tproxy": "tproxy",
+          "tcpFastOpen": true
+        }
+      },
+      "sniffing": {
+        "destOverride": [
+          "fakedns",
+          "http",
+          "tls"
+        ],
+        "enabled": true,
+        "routeOnly": false
+      },
+      "tag": "proxy-in"
+    }
+  ],
+  "dns": {
+    "hosts": {
+      "domain:googleapis.cn": "googleapis.com",
+      "geosite:category-ads-all": "localhost",
+      "api.acstudyus.eu.org": [
+        "104.18.37.237",
+        "172.64.229.2",
+        "162.159.45.63",
+        "2a06:98c1:3104:e78c:df0a:da55:4bf6:341",
+        "2803:f800:51:c:aea1:3107:95ef:19e8"
+      ]
+    },
+    "servers": [
+      {
+        "address": "fakedns",
+        "domains": [
+          "domain:googleapis.cn",
+          "domain:gstatic.com",
+          "geosite:geolocation-!cn"
+        ],
+        "skipFallback": true
+      },
+      {
+        "address": "https://api.acstudyus.eu.org/resolution",
+        "domains": [
+          "domain:eu.org"
+        ],
+        "skipFallback": true,
+        "tag": "resolver-dns"
+      },
+      {
+        "address": "https://223.5.5.5/dns-query",
+        "domains": [
+          "geosite:cn"
+        ],
+        "expectIPs": [
+          "geoip:cn"
+        ],
+        "skipFallback": true,
+        "tag": "domestic-dns"
+      },
+      {
+        "address": "https://1.1.1.1/dns-query",
+        "tag": "remote-dns"
+      }
+    ],
+    "domain_strategy": "UseIP",
+    "disableCache": false
+  },
+  "fakedns": [
+    {
+      "ipPool": "198.18.0.0/15",
+      "poolSize": 65535
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "104.18.85.158",
+            "port": 443,
+            "users": [
+              {
+                "id": "uuid",
+                "encryption": "Encryption"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "tlsSettings": {
+          "allowInsecure": false,
+          "serverName": "domain.com",
+          "alpn": [
+            "h3"
+          ],
+          "fingerprint": "chrome",
+          "echConfigList": "cloudflare-ech.com+https://223.5.5.5/dns-query",
+          "echForceQuery": "full",
+          "echSockopt": {
+            "dialerProxy": "direct"
+          }
+        },
+        "xhttpSettings": {
+          "path": "/path",
+          "host": "domain.com",
+          "mode": "auto"
+        },
+        "finalmask": {
+          "tcp": [
+            {
+              "type": "fragment",
+              "settings": {
+                "packets": "tlshello",
+                "length": "100-200",
+                "delay": "10-20",
+                "maxSplit": "3-6"
+              }
+            }
+          ],
+          "udp": [
+            {
+              "type": "noise",
+              "settings": {
+                "reset": 0,
+                "noise": [
+                  {
+                    "rand": "1-8192",
+                    "randRange": "0-255",
+                    "type": "array",
+                    "delay": "10-20"
+                  }
+                ]
+              }
+            }
+          ],
+          "quicParams": {
+            "congestion": "bbr"
+          }
+        }
+      }
+    },
+    {
+      "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "UseIP"
+      },
+      "tag": "direct"
+    },
+    {
+      "protocol": "blackhole",
+      "settings": {
+        "response": {
+          "type": "http"
+        }
+      },
+      "tag": "block"
+    },
+    {
+      "protocol": "dns",
+      "settings": {
+        "network": "tcp",
+        "address": "1.1.1.1",
+        "port": 53,
+        "nonIPQuery": "skip"
+      },
+      "tag": "dns-out"
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "domainMatcher": "hybrid",
+    "rules": [
+      {
+        "type": "field",
+        "port": 53,
+        "inboundTag": [
+          "proxy-in"
+        ],
+        "outboundTag": "dns-out"
+      },
+      {
+        "inboundTag": [
+          "resolver-dns",
+          "domestic-dns"
+        ],
+        "outboundTag": "direct",
+        "type": "field"
+      },
+      {
+        "inboundTag": [
+          "remote-dns"
+        ],
+        "outboundTag": "proxy",
+        "type": "field"
+      },
+      {
+        "network": "udp",
+        "outboundTag": "block",
+        "port": "443",
+        "type": "field"
+      },
+      {
+        "domains": [
+          "geosite:category-ads-all"
+        ],
+        "outboundTag": "block",
+        "type": "field"
+      },
+      {
+        "domains": [
+          "domain:googleapis.cn",
+          "domain:gstatic.com",
+          "geosite:geolocation-!cn"
+        ],
+        "outboundTag": "proxy",
+        "type": "field"
+      },
+      {
+        "domains": [
+          "geosite:cn",
+          "geosite:private"
+        ],
+        "outboundTag": "direct",
+        "type": "field"
+      },
+      {
+        "ip": [
+          "geoip:cn",
+          "geoip:private"
+        ],
+        "outboundTag": "direct",
+        "type": "field"
+      },
+      {
+        "network": "tcp,udp",
+        "outboundTag": "proxy",
+        "type": "field"
+      }
+    ]
+  }
+}
