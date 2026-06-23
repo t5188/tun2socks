@@ -8,6 +8,7 @@ scripts_dir="/data/adb/tun2socks/scripts"
 restart_proxy() {
   if [ ! -f "${module_dir}/disable" ]; then
     echo "🔁Restart tun2socks"
+    ${scripts_dir}/tun2socks.service disable >/dev/null 2>&1
     ${scripts_dir}/tun2socks.service enable >/dev/null 2>&1
   else
     echo "🥴 Module Disabled"
