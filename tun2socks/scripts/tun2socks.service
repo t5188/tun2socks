@@ -5,8 +5,8 @@ export PATH="/data/adb/ap/bin:/data/adb/ksu/bin:/data/adb/magisk:$PATH"
 . "${scripts_dir}"/tun2socks.ini
 
 permission() {
-  chown -R 0:3005 "${scripts_dir}"
-  chmod -R 755 "${scripts_dir}"
+  chown -R 0:3005 "${parent_dir}"
+  chmod -R 755 "${parent_dir}"
 }
 
 ipv6_enable() {
@@ -179,6 +179,7 @@ nohup busybox setuidgid $uid:$gid "${parent_dir}"/bin/xray run -c "${parent_dir}
 xray_pid=$!
 echo "hev:${hev_pid}" > "${scripts_dir}"/pid.txt
 echo "xray:${xray_pid}" >> "${scripts_dir}"/pid.txt
+toast "tun enable"
 }
 
 stop_tun() {
@@ -189,6 +190,7 @@ while IFS=: read name pid; do
   kill -9 "$pid" 2>/dev/null
 done < "${scripts_dir}"/pid.txt
 find "${parent_dir}" -type f \( -name "*.log" -o -name "*.txt" -o -name "*.list" \) -exec rm -f {} +
+toast "tun disable"
 }
 
 case "$1" in enable) start_tun ;; disable) stop_tun ;; esac
