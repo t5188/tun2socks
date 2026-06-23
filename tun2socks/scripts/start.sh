@@ -6,6 +6,7 @@ export PATH="/data/adb/ap/bin:/data/adb/ksu/bin:/data/adb/magisk:$PATH"
 
 start_proxy() {
   if [[ ! -f "${module_dir}/disable" ]]; then
+    (pgrep -x xray || pgrep -x hev) >/dev/null 2>&1 && ${scripts_dir}/tun2socks.service disable
     ${scripts_dir}/tun2socks.service enable >/dev/null 2>&1
   else
     toast "Module Disabled"
