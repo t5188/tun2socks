@@ -1,5 +1,6 @@
 #!/system/bin/sh
 scripts_dir="$(cd "$(dirname "$0")" && pwd)"
+parent_dir="$(dirname "${scripts_dir}")"
 export PATH="/data/adb/ap/bin:/data/adb/ksu/bin:/data/adb/magisk:$PATH"
 . "${scripts_dir}"/tun2socks.ini
 
@@ -169,12 +170,12 @@ start_tun() {
 permission
 fw_clean iptables
 fw_clean ip6tables
-nohup busybox setuidgid $uid:$gid "${scripts_dir}"/hev "${scripts_dir}"/hev.yml >/dev/null 2>&1 &
+nohup busybox setuidgid $uid:$gid "${parent_dir}"/bin/hev "${parent_dir}"/conf/hev.yml >/dev/null 2>&1 &
 hev_pid=$!
 forward -I
 exec_dns_tun
 uid_rules add
-nohup busybox setuidgid $uid:$gid "${scripts_dir}"/xray run -c "${scripts_dir}"/client.json >/dev/null 2>&1 &
+nohup busybox setuidgid $uid:$gid "${parent_dir}"/bin/xray run -c "${parent_dir}"/conf/client.json >/dev/null 2>&1 &
 xray_pid=$!
 echo "hev:${hev_pid}" > "${scripts_dir}"/pid.txt
 echo "xray:${xray_pid}" >> "${scripts_dir}"/pid.txt
@@ -187,6 +188,7 @@ rm_dns_tun
 while IFS=: read name pid; do
   kill -9 "$pid" 2>/dev/null
 done < "${scripts_dir}"/pid.txt
+find "${parent_dir}" -type f \( -name "*.log" -o -name "*.txt" -o -name "*.list" \) -exec rm -f {} +
 }
 
 case "$1" in enable) start_tun ;; disable) stop_tun ;; esac

@@ -1,6 +1,6 @@
 #!/system/bin/sh
 scripts_dir="$(cd "$(dirname "$0")" && pwd)"
-. "${scripts_dir}/settings.ini"
+. "${scripts_dir}/tun2socks.ini"
 
 start_proxy() {
   if [[ ! -f "${module_dir}/disable" ]]; then
