@@ -2,7 +2,7 @@
   "log": {
     "access": "/data/adb/tun2socks/access.log",
     "error": "/data/adb/tun2socks/error.log",
-    "loglevel": "none",
+    "loglevel": "debug",
     "dnsLog": true
   },
   "inbounds": [
@@ -12,11 +12,11 @@
       "protocol": "socks",
       "settings": {
         "auth": "noauth",
-        "udp": true
+        "udp": true,
+        "userLevel": 8
       },
       "sniffing": {
         "destOverride": [
-          "fakedns",
           "http",
           "tls",
           "quic"
@@ -29,27 +29,11 @@
   "dns": {
     "hosts": {
       "domain:googleapis.cn": "googleapis.com",
-      "geosite:category-ads-all": "localhost",
-      "api.acstudyus.eu.org": [
-        "104.18.37.237",
-        "172.64.229.2",
-        "162.159.45.63",
-        "2a06:98c1:3104:e78c:df0a:da55:4bf6:341",
-        "2803:f800:51:c:aea1:3107:95ef:19e8"
-      ]
+      "geosite:category-ads-all": "127.0.0.1"
     },
     "servers": [
       {
-        "address": "fakedns",
-        "domains": [
-          "domain:googleapis.cn",
-          "domain:gstatic.com",
-          "geosite:geolocation-!cn"
-        ],
-        "skipFallback": true
-      },
-      {
-        "address": "https://api.acstudyus.eu.org/resolution",
+        "address": "https://223.5.5.5/dns-query",
         "domains": [
           "domain:eu.org"
         ],
@@ -75,12 +59,6 @@
     "domain_strategy": "UseIP",
     "disableCache": false
   },
-  "fakedns": [
-    {
-      "ipPool": "198.18.0.0/15",
-      "poolSize": 65535
-    }
-  ],
   "outbounds": [
     {
       "protocol": "freedom",
@@ -100,18 +78,11 @@
     },
     {
       "protocol": "dns",
-      "settings": {
-        "network": "tcp",
-        "address": "1.1.1.1",
-        "port": 53,
-        "nonIPQuery": "skip"
-      },
       "tag": "dns-out"
     }
   ],
   "routing": {
     "domainStrategy": "IPIfNonMatch",
-    "domainMatcher": "hybrid",
     "rules": [
       {
         "type": "field",

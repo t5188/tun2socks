@@ -2,8 +2,8 @@ tunnel:
   name: tun3
   mtu: 8500
   multi-queue: false
-  ipv4: 198.18.0.1
-  ipv6: 'fc00::1'
+  ipv4: 10.10.14.1
+  ipv6: 'fc00::10:10:14:1'
 
 socks5:
   port: 10808
