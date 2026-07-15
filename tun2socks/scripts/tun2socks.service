@@ -131,22 +131,15 @@ forward() {
 
 dns_tun() {
   local name="DNS2TUN"
-  local ip=${1}
+  local ip_cmd=${1}
   local ipt_cmd=${2}
   local action=${3}
   local action1=""
 
-  case "${action}" in
-    "-A")
-      action1="add"
-      ;;
-    "-D")
-      action1="del"
-      ;;
-  esac
+  case "${action}" in "-A") action1="add" ;; "-D") action1="del" ;; esac
 
-  ${ip} rule ${action1} fwmark ${fwmark} table ${index} priority 1000
-  ${ip} route ${action1} default dev ${device} table ${index}
+  ${ip_cmd} rule ${action1} fwmark ${fwmark} table ${index} priority 1000
+  ${ip_cmd} route ${action1} default dev ${device} table ${index}
 
   if [[ "${action}" == "-D" ]]; then
     ${ipt_cmd} -t mangle -D OUTPUT -j ${name}_OUTPUT
